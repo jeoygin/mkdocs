@@ -189,6 +189,46 @@ def build_404(config, env, site_navigation):
     output_path = os.path.join(config['site_dir'], '404.html')
     utils.write_file(output_content.encode('utf-8'), output_path)
 
+def render_page(page, config, dump_json, site_navigation, loader, env):
+    # Read the input file
+    input_path = os.path.join(config['docs_dir'], page.input_path)
+    input_content = open(input_path, 'r').read()
+    if PY2:
+        input_content = input_content.decode('utf-8')
+
+    # Process the markdown text
+    html_content, table_of_contents, meta = convert_markdown(
+        input_content, extensions=config['markdown_extensions']
+    )
+    html_content = post_process_html(html_content, site_navigation)
+
+    context = get_global_context(site_navigation, config)
+    context.update(get_page_context(
+        page, html_content, site_navigation,
+        table_of_contents, meta, config
+    ))
+
+    # Allow 'template:' override in md source files.
+    if 'template' in meta:
+        template = env.get_template(meta['template'][0])
+    else:
+        template = env.get_template('base.html')
+
+    # Render the template.
+    output_content = template.render(context)
+
+    # Write the output file.
+    output_path = os.path.join(config['site_dir'], page.output_path)
+    if dump_json:
+        json_context = {
+            'content': context['content'],
+            'title': context['current_page'].title,
+            'url': context['current_page'].abs_url,
+            'language': 'en',
+        }
+        utils.write_file(json.dumps(json_context, indent=4).encode('utf-8'), output_path.replace('.html', '.json'))
+    else:
+        utils.write_file(output_content.encode('utf-8'), output_path)
 
 def build_pages(config, dump_json=False):
     """
@@ -200,47 +240,20 @@ def build_pages(config, dump_json=False):
 
     build_404(config, env, site_navigation)
 
+    url_context = site_navigation.url_context
+    list_dirs = os.walk(config['docs_dir'])
+    for root, dirs, files in list_dirs:
+        for f in files:
+            if f.endswith('.md'):
+                input_path = os.path.join(root, f)
+                path = input_path[len(config['docs_dir']):].lstrip('/')
+                url = utils.get_url_path(path, config['use_directory_urls'])
+                page = nav.Page(title=None, url=url, path=path, url_context=url_context)
+                site_navigation.url_context.set_current_url(page.abs_url)
+                render_page(page, config, dump_json, site_navigation, loader, env)
+
     for page in site_navigation.walk_pages():
-        # Read the input file
-        input_path = os.path.join(config['docs_dir'], page.input_path)
-        input_content = open(input_path, 'r').read()
-        if PY2:
-            input_content = input_content.decode('utf-8')
-
-        # Process the markdown text
-        html_content, table_of_contents, meta = convert_markdown(
-            input_content, extensions=config['markdown_extensions']
-        )
-        html_content = post_process_html(html_content, site_navigation)
-
-        context = get_global_context(site_navigation, config)
-        context.update(get_page_context(
-            page, html_content, site_navigation,
-            table_of_contents, meta, config
-        ))
-
-        # Allow 'template:' override in md source files.
-        if 'template' in meta:
-            template = env.get_template(meta['template'][0])
-        else:
-            template = env.get_template('base.html')
-
-        # Render the template.
-        output_content = template.render(context)
-
-        # Write the output file.
-        output_path = os.path.join(config['site_dir'], page.output_path)
-        if dump_json:
-            json_context = {
-                'content': context['content'],
-                'title': context['current_page'].title,
-                'url': context['current_page'].abs_url,
-                'language': 'en',
-            }
-            utils.write_file(json.dumps(json_context, indent=4).encode('utf-8'), output_path.replace('.html', '.json'))
-        else:
-            utils.write_file(output_content.encode('utf-8'), output_path)
-
+        render_page(page, config, dump_json, site_navigation, loader, env)
 
 def build(config, live_server=False, dump_json=False, clean_site_dir=False):
     """
