@@ -184,6 +184,40 @@ class Header(object):
             ret += item._indent_print(depth + 1)
         return ret
 
+def _generate_sub_navigation(pages_config, url_context, use_directory_urls, nav_items, pages, parent):
+    if not isinstance(pages_config, dict):
+        assert False, "'page' config should be a 'key: value' pair."
+
+    for title, path in pages_config.iteritems():
+        if isinstance(path, str):
+            url = utils.get_url_path(path, use_directory_urls)
+            page = Page(title=title, url=url, path=path, url_context=url_context)
+
+            if parent:
+                parent.children.append(page)
+                page.ancestors = [parent]
+            else:
+                if not utils.is_homepage(path):
+                    nav_items.append(page)
+
+            if len(pages) > 0:
+                page.previous_page = pages[-1]
+                pages[-1].next_page = page
+            pages.append(page)
+        else:
+            header = Header(title=title, children=[])
+            
+            if parent:
+                parent.children.append(header)
+            else:
+                nav_items.append(header)
+
+            if isinstance(path, list):
+                children = path
+            else:
+                children = [path]
+            for page in children:
+                _generate_sub_navigation(page, url_context, use_directory_urls, nav_items, pages, header)
 
 def _generate_site_navigation(pages_config, url_context, use_directory_urls=True):
     """
@@ -192,56 +226,8 @@ def _generate_site_navigation(pages_config, url_context, use_directory_urls=True
     """
     nav_items = []
     pages = []
-    previous = None
 
-    for config_line in pages_config:
-        if isinstance(config_line, str):
-            path = config_line
-            title, child_title = None, None
-        elif len(config_line) in (1, 2, 3):
-            # Pad any items that don't exist with 'None'
-            padded_config = (list(config_line) + [None, None])[:3]
-            path, title, child_title = padded_config
-        else:
-            msg = (
-                "Line in 'page' config contained %d items.  "
-                "Expected 1, 2 or 3 strings." % len(config_line)
-            )
-            assert False, msg
-
-        if title is None:
-            filename = path.split('/')[0]
-            title = filename_to_title(filename)
-        if child_title is None and '/' in path:
-            filename = path.split('/')[1]
-            child_title = filename_to_title(filename)
-
-        url = utils.get_url_path(path, use_directory_urls)
-
-        if not child_title:
-            # New top level page.
-            page = Page(title=title, url=url, path=path, url_context=url_context)
-            if not utils.is_homepage(path):
-                nav_items.append(page)
-        elif not nav_items or (nav_items[-1].title != title):
-            # New second level page.
-            page = Page(title=child_title, url=url, path=path, url_context=url_context)
-            header = Header(title=title, children=[page])
-            nav_items.append(header)
-            page.ancestors = [header]
-        else:
-            # Additional second level page.
-            page = Page(title=child_title, url=url, path=path, url_context=url_context)
-            header = nav_items[-1]
-            header.children.append(page)
-            page.ancestors = [header]
-
-        # Add in previous and next information.
-        if previous:
-            page.previous_page = previous
-            previous.next_page = page
-        previous = page
-
-        pages.append(page)
+    for page in pages_config:
+        _generate_sub_navigation(page, url_context, use_directory_urls, nav_items, pages, None) 
 
     return (nav_items, pages)

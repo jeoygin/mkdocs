@@ -5,12 +5,14 @@ site_description: Project documentation with Markdown.
 repo_url: https://github.com/tomchristie/mkdocs/
 
 pages:
-- ['index.md', 'Home']
-- ['user-guide/writing-your-docs.md', 'User Guide', 'Writing your docs']
-- ['user-guide/styling-your-docs.md', 'User Guide', 'Styling your docs']
-- ['user-guide/configuration.md', 'User Guide', 'Configuration']
-- ['about/license.md', 'About', 'License']
-- ['about/release-notes.md', 'About', 'Release Notes']
+- Home: index.md
+- User Guide:
+  - Configuration: user-guide/configuration.md
+  - Writing your docs: user-guide/writing-your-docs.md
+  - Styling your docs: user-guide/styling-your-docs.md
+- About:
+  - License: about/license.md
+  - Release Notes: about/release-notes.md
 
 copyright: Copyright &copy; 2014, <a href="https://twitter.com/_tomchristie">Tom Christie</a>.
 google_analytics: ['UA-27795084-5', 'mkdocs.org']
